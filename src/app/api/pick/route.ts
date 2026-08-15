@@ -57,13 +57,17 @@ export async function POST(req: NextRequest) {
     const chosen = eligible[Math.floor(Math.random() * eligible.length)];
 
     await prisma.pick.create({
-      data: { userId, menuItemId: chosen.id },
+      data: {
+        userId,
+        menuItemId: chosen.id,
+        method: categorySlug ? "CATEGORY" : "RANDOM",
+      },
     });
 
     return NextResponse.json({
       ok: true,
       done: false,
-      item: { name: chosen.name, howTo: chosen.howTo },
+      item: { name: chosen.name, steps: chosen.steps },
       category: {
         slug: chosen.category.slug,
         name: chosen.category.name,

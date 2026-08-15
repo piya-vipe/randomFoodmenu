@@ -33,9 +33,17 @@ export default function HistoryList({ picks }: { picks: PickHistoryItem[] }) {
                 </div>
                 <span className="text-xs text-muted-foreground">วิธีทำ</span>
               </summary>
-              <p className="mt-3 border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground">
-                {p.howTo}
-              </p>
+              <ol className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
+                {p.steps.map((step, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
+                  >
+                    <span className="shrink-0">{i + 1}.</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
             </details>
           </li>
         ))}

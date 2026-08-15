@@ -4,7 +4,7 @@ export type ResultState =
   | {
       kind: "item";
       itemName: string;
-      howTo: string;
+      steps: string[];
       categoryName: string;
       categoryEmoji: string;
     }
@@ -30,7 +30,7 @@ export default function ResultModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-3xl bg-surface p-8 text-center shadow-xl animate-pop-in"
+        className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-surface p-8 text-center shadow-xl animate-pop-in"
       >
         {result.kind === "item" ? (
           <>
@@ -38,8 +38,17 @@ export default function ResultModal({
             <p className="text-sm text-muted-foreground">{result.categoryName}</p>
             <h2 className="mt-2 text-2xl font-bold text-primary">{result.itemName}</h2>
             <div className="mt-4 rounded-xl bg-surface-muted p-4 text-left">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">วิธีทำโดยย่อ</p>
-              <p className="text-sm leading-relaxed">{result.howTo}</p>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">วิธีทำ</p>
+              <ol className="flex flex-col gap-2">
+                {result.steps.map((step, i) => (
+                  <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                      {i + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           </>
         ) : (

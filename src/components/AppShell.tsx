@@ -93,7 +93,7 @@ export default function AppShell() {
         setResult({
           kind: "item",
           itemName: res.item.name,
-          howTo: res.item.howTo,
+          steps: res.item.steps,
           categoryName: res.category.name,
           categoryEmoji: res.category.emoji,
           scopeSlug,

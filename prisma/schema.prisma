@@ -12,6 +12,7 @@ model User {
   name      String   @unique
   createdAt DateTime @default(now())
   picks     Pick[]
+  resets    ResetEvent[]
 }
 
 model Category {
@@ -26,7 +27,8 @@ model Category {
 model MenuItem {
   id         String   @id @default(cuid())
   name       String
-  howTo      String
+  // Ordered, step-by-step cooking instructions (one string per step).
+  steps      String[]
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   picks      Pick[]
@@ -34,13 +36,35 @@ model MenuItem {
   @@unique([categoryId, name])
 }
 
+// How a pick was triggered — lets us analyze random vs. deliberate category browsing.
+enum PickMethod {
+  CATEGORY
+  RANDOM
+}
+
 model Pick {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   menuItemId String
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  menuItem   MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  // Nullable: picks recorded before this field existed have no known method.
+  method     PickMethod?
+  createdAt  DateTime    @default(now())
 
   @@unique([userId, menuItemId])
+  @@index([createdAt])
+  @@index([method])
+}
+
+// One row per "รีเซ็ตเมนู" click — lets us analyze how many menus people
+// explore before starting over, and how often people reset.
+model ResetEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clearedCount Int
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
 }

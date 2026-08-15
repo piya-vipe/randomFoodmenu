@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const pickHistory: PickHistoryItem[] = picks.map((p) => ({
       id: p.id,
       menuItemName: p.menuItem.name,
-      howTo: p.menuItem.howTo,
+      steps: p.menuItem.steps,
       categorySlug: p.menuItem.category.slug,
       categoryName: p.menuItem.category.name,
       categoryEmoji: p.menuItem.category.emoji ?? "🍽️",

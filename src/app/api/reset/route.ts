@@ -21,7 +21,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await prisma.pick.deleteMany({ where: { userId } });
+    await prisma.$transaction(async (tx) => {
+      const clearedCount = await tx.pick.count({ where: { userId } });
+      if (clearedCount > 0) {
+        await tx.resetEvent.create({ data: { userId, clearedCount } });
+      }
+      await tx.pick.deleteMany({ where: { userId } });
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("POST /api/reset failed:", err);

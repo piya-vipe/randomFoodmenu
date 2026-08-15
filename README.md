@@ -7,10 +7,11 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 ## Features
 
 - Enter a name → creates/loads a user (stored server-side in Postgres, so history follows you across devices/browsers under the same name).
-- 6 categories × 5-6 menu items each, each with a brief how-to-cook note (see [prisma/seed.ts](prisma/seed.ts)).
+- 6 categories × 5-6 menu items each, each with a step-by-step how-to-cook guide (see [prisma/seed.ts](prisma/seed.ts)).
 - Pick a category, or hit "สุ่มสุดๆ" to pick from every category at once.
 - Already-picked items are excluded from future random picks for that user, until they hit **รีเซ็ตเมนู**.
-- Progress shown per-category and as a running history list.
+- Progress shown per-category and as a running history list (with expandable recipe steps).
+- **Usage analytics**: every pick and reset is logged (which category, random-vs-deliberate, how many menus were cleared on reset), surfaced on a key-protected `/insights` dashboard — see [Insights dashboard](#insights-dashboard) below.
 
 ## Tech stack
 
@@ -23,17 +24,19 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 
 ```
 prisma/
-  schema.prisma      # User, Category, MenuItem, Pick models
-  seed.ts            # 6 categories x 5-6 menu items, each with a how-to note (Thai)
+  schema.prisma      # User, Category, MenuItem, Pick, ResetEvent models
+  seed.ts            # 6 categories x 5-6 menu items, each with step-by-step instructions (Thai)
 src/
   app/
     api/
-      user/route.ts    # POST: get-or-create user by name
-      state/route.ts   # GET: categories + pick history for a user
-      pick/route.ts     # POST: random-pick a menu (category or all), records it
-      reset/route.ts    # POST: clear a user's picks
+      user/route.ts      # POST: get-or-create user by name
+      state/route.ts     # GET: categories + pick history for a user
+      pick/route.ts       # POST: random-pick a menu (category or all), records it + how it was picked
+      reset/route.ts      # POST: clear a user's picks, logs a ResetEvent
+      insights/route.ts   # GET: aggregated analytics (key-protected via INSIGHTS_KEY)
+    insights/page.tsx   # /insights dashboard
     layout.tsx, page.tsx, globals.css
-  components/           # NameForm, Header, CategoryGrid, ResultModal, HistoryList, AppShell
+  components/           # NameForm, Header, CategoryGrid, ResultModal, HistoryList, AppShell, InsightsView
   lib/                  # prisma client singleton, typed API client, shared types
 ```
 
@@ -94,6 +97,23 @@ git push -u origin main
 | Variable       | Value                                    |
 | -------------- | ----------------------------------------- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (from the Postgres plugin) |
+| `INSIGHTS_KEY` | Any secret string you make up — required to view `/insights` |
+
+## Insights dashboard
+
+Visit `/insights` on your deployed app (or `http://localhost:3000/insights` locally). It asks for a key, which must match the `INSIGHTS_KEY` environment variable — without that variable set, the API refuses all requests (fails closed, not open).
+
+What it shows, all computed live from the database:
+
+- **Totals**: registered users, users who've actually picked something, total picks, total resets.
+- **Random vs. deliberate**: how often people hit "สุ่มสุดๆ" (full random) vs. picking a specific category first.
+- **Category popularity**: pick count and share per category, plus what % of people who tried a category ended up completing all of its items.
+- **Top 10 menu items** and, just as usefully, **items nobody has ever picked** — good signal for what to swap out of the menu.
+- **Most active users** by pick count and how many distinct categories they've explored.
+- **Reset behavior**: how many times people reset, and on average how many menus they'd collected first (a proxy for "how much people explore before starting over").
+- **14-day activity chart** of picks per day.
+
+This data comes from two things recorded automatically as people use the app: every `Pick` now stores whether it came from a specific category or full-random, and every reset writes a `ResetEvent` with how many menus were cleared. Nothing beyond a user's chosen name and their menu picks is collected — no device/location/tracking data.
 
 ## Troubleshooting
 
@@ -106,4 +126,6 @@ This means `DATABASE_URL` isn't set in whatever environment is running the comma
 ## Notes / things you may want to customize
 
 - Users are matched **by name only** (no login) — two people using the same name share one history. Fine for a small friend-group app; add a PIN/passcode field to `User` if you need real accounts later.
-- Edit [prisma/seed.ts](prisma/seed.ts) to add/remove categories or menu items, then run `npm run db:seed` again.
+- Edit [prisma/seed.ts](prisma/seed.ts) to add/remove categories, menu items, or recipe steps, then let the next deploy (or `npm run db:seed`) pick it up.
+- `Pick.method` (category vs. random) is `null` for picks made before this field was added — the insights dashboard reports those separately as "unknown" rather than guessing.
+- Ideas for more insight if you want to extend this further: log when someone hits an already-fully-explored category (currently only successful picks are logged), or bucket pick timestamps by hour of day to see when people are most likely to be hungry.
