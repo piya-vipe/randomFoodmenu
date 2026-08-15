@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  picks     Pick[]
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String
+  emoji     String?
+  order     Int        @default(0)
+  menuItems MenuItem[]
+}
+
+model MenuItem {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  picks      Pick[]
+
+  @@unique([categoryId, name])
+}
+
+model Pick {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, menuItemId])
+}
