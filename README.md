@@ -84,15 +84,10 @@ git push -u origin main
 3. **Wire the database URL to the web service**: open your web service → "Variables" → add a new variable:
    - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (reference the Postgres plugin's variable — Railway autocompletes this)
 4. **Deploy**. Railway auto-detects Next.js via Nixpacks and runs `npm install` → `npm run build` → `npm run start`.
-   - `npm run start` runs `prisma migrate deploy && next start`, so your database schema is applied automatically on every deploy.
-5. **Seed the menu data once**, after the first successful deploy. From your local machine (with `DATABASE_URL` pointed at the Railway Postgres, e.g. via `railway run` or by pasting the public connection string into your local `.env`):
+   - `npm run start` runs `prisma migrate deploy && npm run db:seed && next start` — so on every deploy, the schema is migrated **and** the menu data is (re)seeded automatically. No manual seeding step needed. Seeding is idempotent (upserts + prunes anything removed from `prisma/seed.ts`), so it's safe to run on every boot.
+5. Open the generated Railway domain (Settings → Networking → "Generate Domain") to try the app.
 
-   ```bash
-   npm run db:seed
-   ```
-
-   (Safe to re-run — seeding uses upserts.)
-6. Open the generated Railway domain (Settings → Networking → "Generate Domain") to try the app.
+> If you ever need to seed manually from your own machine (e.g. for local dev against a Railway DB), you need the Postgres service's **public** connection string (`DATABASE_PUBLIC_URL` on the Postgres service's Variables tab), not the `...railway.internal` one — that hostname only resolves inside Railway's private network.
 
 ### Environment variables needed on Railway
 
