@@ -100,6 +100,14 @@ git push -u origin main
 | -------------- | ----------------------------------------- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (from the Postgres plugin) |
 
+## Troubleshooting
+
+**`Error: Environment variable not found: DATABASE_URL` when running `npm run start` / `npm run build`**
+
+This means `DATABASE_URL` isn't set in whatever environment is running the command:
+- **Locally**: make sure a `.env` file exists in the project root (copy `.env.example`) with a real `DATABASE_URL`, and that you're running commands from the project root.
+- **On Railway**: open your web service → Variables and confirm `DATABASE_URL` is set (see [Environment variables needed on Railway](#environment-variables-needed-on-railway) above). If you added the Postgres plugin after the first deploy, redeploy the web service once the variable is set.
+
 ## Notes / things you may want to customize
 
 - Users are matched **by name only** (no login) — two people using the same name share one history. Fine for a small friend-group app; add a PIN/passcode field to `User` if you need real accounts later.
