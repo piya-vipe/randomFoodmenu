@@ -22,13 +22,21 @@ export default function HistoryList({ picks }: { picks: PickHistoryItem[] }) {
         {picks.map((p) => (
           <li
             key={p.id}
-            className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3"
+            className="rounded-xl border border-border bg-surface px-4 py-3"
           >
-            <span className="text-xl">{p.categoryEmoji}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{p.menuItemName}</p>
-              <p className="truncate text-xs text-muted-foreground">{p.categoryName}</p>
-            </div>
+            <details>
+              <summary className="flex cursor-pointer list-none items-center gap-3">
+                <span className="text-xl">{p.categoryEmoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{p.menuItemName}</p>
+                  <p className="truncate text-xs text-muted-foreground">{p.categoryName}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">วิธีทำ</span>
+              </summary>
+              <p className="mt-3 border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground">
+                {p.howTo}
+              </p>
+            </details>
           </li>
         ))}
       </ul>

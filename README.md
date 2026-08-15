@@ -7,7 +7,7 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 ## Features
 
 - Enter a name → creates/loads a user (stored server-side in Postgres, so history follows you across devices/browsers under the same name).
-- 10 categories × 6+ menu items each (see [prisma/seed.ts](prisma/seed.ts)).
+- 6 categories × 5-6 menu items each, each with a brief how-to-cook note (see [prisma/seed.ts](prisma/seed.ts)).
 - Pick a category, or hit "สุ่มสุดๆ" to pick from every category at once.
 - Already-picked items are excluded from future random picks for that user, until they hit **รีเซ็ตเมนู**.
 - Progress shown per-category and as a running history list.
@@ -24,7 +24,7 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 ```
 prisma/
   schema.prisma      # User, Category, MenuItem, Pick models
-  seed.ts            # 10 categories x 6+ menu items (Thai)
+  seed.ts            # 6 categories x 5-6 menu items, each with a how-to note (Thai)
 src/
   app/
     api/

@@ -1,7 +1,13 @@
 "use client";
 
 export type ResultState =
-  | { kind: "item"; itemName: string; categoryName: string; categoryEmoji: string }
+  | {
+      kind: "item";
+      itemName: string;
+      howTo: string;
+      categoryName: string;
+      categoryEmoji: string;
+    }
   | { kind: "done"; message: string };
 
 export default function ResultModal({
@@ -31,6 +37,10 @@ export default function ResultModal({
             <div className="mb-2 text-5xl">{result.categoryEmoji}</div>
             <p className="text-sm text-muted-foreground">{result.categoryName}</p>
             <h2 className="mt-2 text-2xl font-bold text-primary">{result.itemName}</h2>
+            <div className="mt-4 rounded-xl bg-surface-muted p-4 text-left">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">วิธีทำโดยย่อ</p>
+              <p className="text-sm leading-relaxed">{result.howTo}</p>
+            </div>
           </>
         ) : (
           <>

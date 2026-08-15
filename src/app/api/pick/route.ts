@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       done: false,
-      item: { name: chosen.name },
+      item: { name: chosen.name, howTo: chosen.howTo },
       category: {
         slug: chosen.category.slug,
         name: chosen.category.name,

@@ -9,6 +9,7 @@ export type CategorySummary = {
 export type PickHistoryItem = {
   id: string;
   menuItemName: string;
+  howTo: string;
   categorySlug: string;
   categoryName: string;
   categoryEmoji: string;
@@ -25,7 +26,7 @@ export type PickResponse =
   | {
       ok: true;
       done: false;
-      item: { name: string };
+      item: { name: string; howTo: string };
       category: { slug: string; name: string; emoji: string };
     }
   | {
