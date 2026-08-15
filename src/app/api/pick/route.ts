@@ -24,49 +24,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "userId is required" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "ไม่พบผู้ใช้นี้" }, { status: 404 });
-  }
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ ok: false, error: "ไม่พบผู้ใช้นี้" }, { status: 404 });
+    }
 
-  const alreadyPicked = await prisma.pick.findMany({
-    where: { userId },
-    select: { menuItemId: true },
-  });
-  const excludeIds = alreadyPicked.map((p) => p.menuItemId);
+    const alreadyPicked = await prisma.pick.findMany({
+      where: { userId },
+      select: { menuItemId: true },
+    });
+    const excludeIds = alreadyPicked.map((p) => p.menuItemId);
 
-  const eligible = await prisma.menuItem.findMany({
-    where: {
-      ...(categorySlug ? { category: { slug: categorySlug } } : {}),
-      ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
-    },
-    include: { category: true },
-  });
+    const eligible = await prisma.menuItem.findMany({
+      where: {
+        ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+        ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+      },
+      include: { category: true },
+    });
 
-  if (eligible.length === 0) {
+    if (eligible.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        message: categorySlug
+          ? "คุณลองครบทุกเมนูในหมวดนี้แล้ว! ลองหมวดอื่น หรือกดรีเซ็ตเพื่อเริ่มใหม่"
+          : "คุณลองครบทุกเมนูในระบบแล้ว! กดรีเซ็ตเพื่อเริ่มใหม่",
+      });
+    }
+
+    const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+
+    await prisma.pick.create({
+      data: { userId, menuItemId: chosen.id },
+    });
+
     return NextResponse.json({
       ok: true,
-      done: true,
-      message: categorySlug
-        ? "คุณลองครบทุกเมนูในหมวดนี้แล้ว! ลองหมวดอื่น หรือกดรีเซ็ตเพื่อเริ่มใหม่"
-        : "คุณลองครบทุกเมนูในระบบแล้ว! กดรีเซ็ตเพื่อเริ่มใหม่",
+      done: false,
+      item: { name: chosen.name },
+      category: {
+        slug: chosen.category.slug,
+        name: chosen.category.name,
+        emoji: chosen.category.emoji ?? "🍽️",
+      },
     });
+  } catch (err) {
+    console.error("POST /api/pick failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้ง" },
+      { status: 500 }
+    );
   }
-
-  const chosen = eligible[Math.floor(Math.random() * eligible.length)];
-
-  await prisma.pick.create({
-    data: { userId, menuItemId: chosen.id },
-  });
-
-  return NextResponse.json({
-    ok: true,
-    done: false,
-    item: { name: chosen.name },
-    category: {
-      slug: chosen.category.slug,
-      name: chosen.category.name,
-      emoji: chosen.category.emoji ?? "🍽️",
-    },
-  });
 }

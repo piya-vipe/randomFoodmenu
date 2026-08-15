@@ -26,11 +26,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = await prisma.user.upsert({
-    where: { name },
-    update: {},
-    create: { name },
-  });
+  try {
+    const user = await prisma.user.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
 
-  return NextResponse.json({ id: user.id, name: user.name });
+    return NextResponse.json({ id: user.id, name: user.name });
+  } catch (err) {
+    console.error("POST /api/user failed:", err);
+    return NextResponse.json(
+      { error: "เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้ง" },
+      { status: 500 }
+    );
+  }
 }
