@@ -141,3 +141,26 @@ export type AdminDataResponse = {
   categories: AdminCategory[];
   menuItems: AdminMenuItem[];
 };
+
+/* ---------- CSV import ---------- */
+
+export type ImportRowResult = {
+  line: number;
+  menuName: string;
+  categoryName: string;
+  action: "create" | "update" | "error";
+  message?: string;
+  ingredientCount?: number;
+  stepCount?: number;
+  servingSize?: string;
+};
+
+export type ImportReport = {
+  dryRun: boolean;
+  totalRows: number;
+  created: number;
+  updated: number;
+  errors: number;
+  categoriesToCreate: string[];
+  rows: ImportRowResult[];
+};

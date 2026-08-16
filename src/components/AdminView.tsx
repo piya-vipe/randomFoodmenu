@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { AdminDataResponse, AdminMenuItem } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AdminDataResponse, AdminMenuItem, ImportReport } from "@/lib/types";
 
 const STORAGE_KEY = "menuPicker.adminKey";
 
@@ -37,6 +37,13 @@ export default function AdminView() {
   // New-category form
   const [newCatName, setNewCatName] = useState("");
   const [newCatEmoji, setNewCatEmoji] = useState("");
+
+  // CSV import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvText, setCsvText] = useState<string | null>(null);
+  const [csvFileName, setCsvFileName] = useState<string>("");
+  const [preview, setPreview] = useState<ImportReport | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async (k: string) => {
     setLoading(true);
@@ -167,6 +174,78 @@ export default function AdminView() {
     }
   }
 
+  async function handleFileChosen(file: File) {
+    setError(null);
+    setPreview(null);
+    const text = await file.text();
+    setCsvText(text);
+    setCsvFileName(file.name);
+
+    // Validate immediately (dry run) so problems surface before any writes.
+    setImporting(true);
+    try {
+      const report = (await callApi("/api/admin/import", {
+        method: "POST",
+        body: JSON.stringify({ csv: text, dryRun: true }),
+      })) as ImportReport;
+      setPreview(report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อ่านไฟล์ไม่สำเร็จ");
+      setCsvText(null);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleConfirmImport() {
+    if (!csvText) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const report = (await callApi("/api/admin/import", {
+        method: "POST",
+        body: JSON.stringify({ csv: csvText, dryRun: false }),
+      })) as ImportReport;
+      flash(`นำเข้าสำเร็จ — เพิ่มใหม่ ${report.created} เมนู, อัปเดต ${report.updated} เมนู`);
+      clearImport();
+      await load(key);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "นำเข้าไม่สำเร็จ");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function clearImport() {
+    setCsvText(null);
+    setCsvFileName("");
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  /** Fetch a key-protected file and hand it to the browser as a download. */
+  async function downloadExport() {
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/export", { headers: { "x-admin-key": key } });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "ส่งออกไม่สำเร็จ");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `menu-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ส่งออกไม่สำเร็จ");
+    }
+  }
+
   function startEdit(item: AdminMenuItem) {
     setForm({
       id: item.id,
@@ -243,6 +322,169 @@ export default function AdminView() {
           {error}
         </div>
       )}
+
+      {/* ---- CSV import / export ---- */}
+      <section className="mb-8 rounded-2xl border border-border bg-surface p-5">
+        <h2 className="mb-1 font-semibold">📄 นำเข้าเมนูจากไฟล์ CSV</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          ให้ AI ตัวอื่นช่วยรีเสิร์ชเมนู แล้วอัปโหลดไฟล์ CSV เข้ามาทีเดียวได้เลย
+        </p>
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          <a
+            href="/menu-template.csv"
+            download
+            className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-muted"
+          >
+            ⬇️ ดาวน์โหลดไฟล์ตัวอย่าง (template)
+          </a>
+          <a
+            href="/ai-prompt.txt"
+            download
+            className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-muted"
+          >
+            🤖 ดาวน์โหลด prompt สำหรับ AI
+          </a>
+          <button
+            onClick={downloadExport}
+            className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-muted"
+          >
+            ⬇️ ส่งออกเมนูปัจจุบันเป็น CSV
+          </button>
+        </div>
+
+        <details className="mb-4 rounded-lg bg-surface-muted p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            รูปแบบไฟล์ CSV (กดเพื่อดู)
+          </summary>
+          <div className="mt-3 text-sm text-muted-foreground">
+            <p className="mb-2">บรรทัดแรกต้องเป็นหัวตารางนี้:</p>
+            <pre className="mb-3 overflow-x-auto rounded bg-surface p-2 text-xs">
+              category_name,category_emoji,menu_name,serving_size,ingredients,steps
+            </pre>
+            <ul className="flex flex-col gap-1.5">
+              <li>
+                • <b>ingredients</b> และ <b>steps</b> — คั่นแต่ละรายการด้วยเครื่องหมาย{" "}
+                <code className="rounded bg-surface px-1">|</code> (ห้ามใช้ comma)
+              </li>
+              <li>
+                • <b>ingredients</b> — ระบุปริมาณสำหรับ 1 ที่ เช่น &quot;ไข่ไก่ 2 ฟอง&quot;
+              </li>
+              <li>
+                • <b>serving_size</b> — เช่น &quot;1 จาน&quot; (ถ้าเว้นว่างจะใช้ &quot;1 ที่&quot;)
+              </li>
+              <li>
+                • <b>category_name</b> — ถ้าไม่มีหมวดนี้อยู่ ระบบจะสร้างให้ใหม่อัตโนมัติ
+              </li>
+              <li>• เมนูที่ชื่อซ้ำกับของเดิมในหมวดเดียวกัน จะถูกอัปเดตทับ</li>
+              <li>• เมนูที่นำเข้าทั้งหมดจะถูกบันทึกเป็นแบบ &quot;เพิ่มเอง&quot; (ไม่ถูกลบตอน deploy)</li>
+            </ul>
+          </div>
+        </details>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileChosen(file);
+          }}
+          className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary-hover"
+        />
+
+        {importing && !preview && (
+          <p className="mt-3 text-sm text-muted-foreground">กำลังตรวจสอบไฟล์...</p>
+        )}
+
+        {preview && (
+          <div className="mt-4 rounded-xl border border-border p-4">
+            <p className="mb-2 font-medium">
+              ตรวจสอบไฟล์ &quot;{csvFileName}&quot; แล้ว
+            </p>
+            <div className="mb-3 flex flex-wrap gap-3 text-sm">
+              <span className="rounded-lg bg-green-100 px-2.5 py-1 text-green-800">
+                เพิ่มใหม่ {preview.created}
+              </span>
+              <span className="rounded-lg bg-blue-100 px-2.5 py-1 text-blue-800">
+                อัปเดต {preview.updated}
+              </span>
+              {preview.errors > 0 && (
+                <span className="rounded-lg bg-red-100 px-2.5 py-1 text-red-800">
+                  มีปัญหา {preview.errors}
+                </span>
+              )}
+            </div>
+
+            {preview.categoriesToCreate.length > 0 && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                จะสร้างหมวดหมู่ใหม่: {preview.categoriesToCreate.join(", ")}
+              </p>
+            )}
+
+            <div className="mb-3 max-h-64 overflow-y-auto rounded-lg border border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-surface-muted">
+                  <tr>
+                    <th className="px-2 py-1.5">บรรทัด</th>
+                    <th className="px-2 py-1.5">เมนู</th>
+                    <th className="px-2 py-1.5">หมวด</th>
+                    <th className="px-2 py-1.5">ผลลัพธ์</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((r) => (
+                    <tr
+                      key={r.line}
+                      className={`border-t border-border ${
+                        r.action === "error" ? "bg-red-50" : ""
+                      }`}
+                    >
+                      <td className="px-2 py-1.5 text-muted-foreground">{r.line}</td>
+                      <td className="px-2 py-1.5">{r.menuName}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{r.categoryName}</td>
+                      <td className="px-2 py-1.5">
+                        {r.action === "create" && <span className="text-green-700">เพิ่มใหม่</span>}
+                        {r.action === "update" && <span className="text-blue-700">อัปเดต</span>}
+                        {r.action === "error" && (
+                          <span className="text-red-700">ข้าม — {r.message}</span>
+                        )}
+                        {r.action !== "error" && r.message && (
+                          <span className="ml-1 text-muted-foreground">({r.message})</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {preview.errors > 0 && (
+              <p className="mb-3 text-xs text-muted-foreground">
+                บรรทัดที่มีปัญหาจะถูกข้ามไป ส่วนบรรทัดที่เหลือยังนำเข้าได้ตามปกติ
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmImport}
+                disabled={importing || preview.created + preview.updated === 0}
+                className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+              >
+                {importing
+                  ? "กำลังนำเข้า..."
+                  : `ยืนยันนำเข้า ${preview.created + preview.updated} เมนู`}
+              </button>
+              <button
+                onClick={clearImport}
+                className="rounded-lg border border-border px-5 py-2.5 font-medium hover:bg-surface-muted"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ---- Add / edit menu item ---- */}
       <section className="mb-8 rounded-2xl border border-border bg-surface p-5">

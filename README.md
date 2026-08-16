@@ -40,12 +40,18 @@ src/
       insights/route.ts        # GET: aggregated analytics (key-protected)
       admin/menu/route.ts      # GET/POST/PATCH/DELETE: menu item CRUD (key-protected)
       admin/category/route.ts  # POST/DELETE: category CRUD (key-protected)
+      admin/import/route.ts    # POST: bulk CSV import, with dry-run validation
+      admin/export/route.ts    # GET: all menus as CSV
     insights/page.tsx   # /insights dashboard
     admin/page.tsx      # /admin menu manager
     layout.tsx, page.tsx, globals.css
   components/           # NameForm, Header, CategoryGrid, ShuffleOverlay, Confetti,
                         # ResultModal, HistoryList, AppShell, InsightsView, AdminView
-  lib/                  # prisma client singleton, typed API client, admin auth helper, shared types
+  lib/                  # prisma client singleton, typed API client, admin auth helper,
+                        # CSV parser/serializer, shared types
+public/
+  menu-template.csv     # example CSV in the import format
+  ai-prompt.txt         # ready-made prompt to hand another AI for menu research
 ```
 
 ## Local development
@@ -130,11 +136,43 @@ This data comes from what's recorded automatically as people use the app: every 
 
 Visit `/admin` (key: `ADMIN_KEY`, or `INSIGHTS_KEY` if you didn't set a separate one). From there you can:
 
+- **Bulk-import menus from a CSV file** — see [CSV import](#csv-import) below.
+- **Export all current menus** as a CSV (same format as import, so you can round-trip).
 - **Add a menu** to any category, with a serving size, an ingredient list (one per line), and numbered steps (one per line).
 - **Edit** any existing menu's name, serving size, ingredients, or steps.
 - **Hide** a menu (`isActive: false`) — it stops appearing in random picks but keeps its history and votes intact. Better than deleting when you just want to retire something.
 - **Delete** a menu permanently (also removes its picks and votes).
 - **Add a category** with its own emoji.
+
+### CSV import
+
+The `/admin` page can bulk-load menus from a CSV file — handy for having another AI research a batch of dishes and then importing the result in one go.
+
+**Format** — the first row must be a header. Column order doesn't matter, and the names are matched case-insensitively (with a few aliases, including Thai):
+
+```
+category_name,category_emoji,menu_name,serving_size,ingredients,steps
+```
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| `category_name` | ✅ | Matched against existing categories by name. If it doesn't exist, it's created automatically. |
+| `category_emoji` | — | Only used when creating a new category. Defaults to 🍽️. |
+| `menu_name` | ✅ | Must be unique within its category. An existing match is **updated**, not duplicated. |
+| `serving_size` | — | e.g. `1 จาน`. Defaults to `1 ที่`. |
+| `ingredients` | — | Multiple items separated by `\|`. Quantities should be for one serving. |
+| `steps` | ✅ | Multiple steps separated by `\|`. Don't number them — the UI does that. |
+
+**Why `|` and not commas**: commas separate CSV columns, so list items inside a single cell use a pipe instead. Cells containing commas still work if quoted (`"ข้าว, ผัด"`) — standard CSV quoting, escaped quotes, and embedded newlines are all handled.
+
+**Two helper downloads**, both linked from `/admin`:
+
+- [`/menu-template.csv`](public/menu-template.csv) — a filled-in example file to open in Excel/Sheets or hand to an AI as a format reference.
+- [`/ai-prompt.txt`](public/ai-prompt.txt) — a ready-made Thai prompt to paste into another AI, telling it exactly what format to produce. Fill in the last line with what you want researched.
+
+**Import is a two-step flow**: choosing a file runs a server-side **dry run** first, showing you a per-row preview (create / update / skipped-with-reason, plus any categories that would be created). Nothing is written until you press confirm. Rows with errors are skipped individually — one bad row doesn't block the rest of the file.
+
+Everything imported is marked `MANUAL`, so it survives redeploys (see below).
 
 ### How manual menus survive redeploys
 
