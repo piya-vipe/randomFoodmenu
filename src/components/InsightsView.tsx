@@ -139,6 +139,12 @@ export default function InsightsView() {
         <h1 className="text-lg font-semibold">📊 Insights</h1>
         <div className="flex items-center gap-2">
           <a
+            href="/admin/users"
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted"
+          >
+            👥 ผู้ใช้
+          </a>
+          <a
             href="/admin"
             className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted"
           >

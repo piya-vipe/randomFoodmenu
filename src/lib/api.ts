@@ -11,11 +11,32 @@ async function parseJsonOrThrow<T>(res: Response): Promise<T> {
   return data as T;
 }
 
-export async function createOrGetUser(name: string): Promise<{ id: string; name: string }> {
+export async function createOrGetUser(
+  name: string
+): Promise<{ id: string; name: string; visitId: string }> {
   const res = await fetch("/api/user", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
+  });
+  return parseJsonOrThrow(res);
+}
+
+export async function saveLocation(
+  visitId: string,
+  coords: { latitude: number; longitude: number; accuracy: number }
+): Promise<{ ok: true }> {
+  const res = await fetch("/api/location", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visitId, ...coords }),
+  });
+  return parseJsonOrThrow(res);
+}
+
+export async function deleteLocation(userId: string): Promise<{ ok: true }> {
+  const res = await fetch(`/api/location?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
   });
   return parseJsonOrThrow(res);
 }

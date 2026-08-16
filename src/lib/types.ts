@@ -142,6 +142,83 @@ export type AdminDataResponse = {
   menuItems: AdminMenuItem[];
 };
 
+/* ---------- Per-user analytics ---------- */
+
+export type DeviceInfo = {
+  browser: string;
+  os: string;
+  deviceType: string;
+};
+
+export type UserSummary = {
+  id: string;
+  name: string;
+  createdAt: string;
+  pickCount: number;
+  voteCount: number;
+  resetCount: number;
+  visitCount: number;
+  lastSeen: string | null;
+  lastDevice: DeviceInfo | null;
+  hasLocation: boolean;
+};
+
+export type MapPin = {
+  userId: string;
+  userName: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  recordedAt: string;
+};
+
+export type UsersResponse = {
+  users: UserSummary[];
+  deviceMix: { label: string; count: number }[];
+  browserMix: { label: string; count: number }[];
+  osMix: { label: string; count: number }[];
+  pins: MapPin[];
+  locationConsentCount: number;
+};
+
+export type UserVisit = {
+  id: string;
+  browser: string;
+  os: string;
+  deviceType: string;
+  locationConsent: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null;
+  createdAt: string;
+};
+
+export type UserPickRow = {
+  id: string;
+  menuItemName: string;
+  categoryName: string;
+  categoryEmoji: string;
+  method: PickMethod | null;
+  vote: Vote | null;
+  createdAt: string;
+};
+
+export type UserDetail = {
+  id: string;
+  name: string;
+  createdAt: string;
+  pickCount: number;
+  likeCount: number;
+  dislikeCount: number;
+  resetCount: number;
+  visitCount: number;
+  lastSeen: string | null;
+  visits: UserVisit[];
+  picks: UserPickRow[];
+  categoryBreakdown: { name: string; emoji: string; count: number; percent: number }[];
+  dailyActivity: { date: string; count: number }[];
+};
+
 /* ---------- CSV import ---------- */
 
 export type ImportRowResult = {

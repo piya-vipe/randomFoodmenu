@@ -112,7 +112,8 @@ git push -u origin main
 | -------------- | ----------------------------------------- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (from the Postgres plugin) |
 | `INSIGHTS_KEY` | Any secret string you make up — required to view `/insights` |
-| `ADMIN_KEY`    | Secret for `/admin` (menu manager). Optional — falls back to `INSIGHTS_KEY` if unset |
+| `ADMIN_KEY`    | Secret for `/admin` and `/admin/users`. Optional — falls back to `INSIGHTS_KEY` if unset |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional. Enables the map on `/admin/users`. Needs "Maps JavaScript API" enabled |
 
 ## Insights dashboard
 
@@ -131,6 +132,36 @@ What it shows, all computed live from the database:
 - **⚠️ Drop candidates** — menus with at least 3 votes and under 40% likes. This is the "which menus should we delete" list.
 
 This data comes from what's recorded automatically as people use the app: every `Pick` stores whether it came from a specific category or full-random, every reset writes a `ResetEvent` with how many menus were cleared, and every 👍/👎 writes a `Feedback` row. Nothing beyond a user's chosen name, their picks, and their votes is collected — no device/location/tracking data.
+
+## Per-user data (`/admin/users`)
+
+A dedicated dashboard for looking at individual users, behind the same admin key.
+
+**List view** shows every user with pick/vote counts, last device, whether they shared location, and last-seen time — plus aggregate breakdowns of device type, browser, and OS, and a **Google Map** of everyone who opted into location sharing.
+
+**Drill-down** (click any user) shows that person's full picture: their device history, which categories they favour, a 14-day activity chart, and their complete pick history with the 👍/👎 they gave each dish.
+
+### What gets collected, and how
+
+| Data | Source | Consent |
+| --- | --- | --- |
+| Name, picks, votes, resets | The app itself | Implicit — it's the app's core function |
+| Browser, OS, device type | `User-Agent` header the browser already sends on every request | None needed; it's not personally identifying |
+| Precise latitude/longitude | Browser Geolocation API | **Explicit** — the browser shows its own permission prompt |
+
+A few deliberate decisions worth knowing:
+
+- **No IP addresses are stored.** Not in the database, not in logs.
+- **Location is genuinely optional.** Users get a skippable ask after signing in, and the app is fully functional without it. There's a "ลบข้อมูลตำแหน่งของฉัน" button on the main screen so anyone can withdraw consent and erase what was stored.
+- **The app has a visible privacy notice** on the name-entry screen ("เราเก็บข้อมูลอะไรบ้าง?") listing exactly what's collected.
+
+> **Why not silent location tracking?** Browsers do not permit it — the Geolocation API always prompts, with no bypass. IP-based city lookup is the only prompt-free option, and it requires sending every visitor's IP to a third-party geolocation service (a data-sharing decision in itself) while only yielding city-level accuracy, often just the mobile carrier's gateway. Opt-in GPS gives far better data from the people who agree. Note also that location data is personal data under Thailand's PDPA, so the notice and opt-in aren't just good manners — they're what makes the dataset defensible in a university project.
+
+### Setting up the map
+
+The map is optional. Without a key, `/admin/users` still lists every coordinate with links out to Google Maps.
+
+To enable it: create a Google Maps API key ([console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials), enable **Maps JavaScript API** for it, then set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in Railway. Restrict the key to your domain — it's exposed to the browser by necessity, as all Maps JS keys are.
 
 ## Managing menus
 

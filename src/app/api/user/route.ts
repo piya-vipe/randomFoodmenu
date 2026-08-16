@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseUserAgent } from "@/lib/userAgent";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,23 @@ export async function POST(req: NextRequest) {
       create: { name },
     });
 
-    return NextResponse.json({ id: user.id, name: user.name });
+    // Log the sign-in with device info derived from the User-Agent header the
+    // browser already sends. No IP address is stored.
+    const rawUa = req.headers.get("user-agent");
+    const { browser, os, deviceType } = parseUserAgent(rawUa);
+
+    const visit = await prisma.visit.create({
+      data: {
+        userId: user.id,
+        userAgent: rawUa?.slice(0, 500) ?? null,
+        browser,
+        os,
+        deviceType,
+      },
+      select: { id: true },
+    });
+
+    return NextResponse.json({ id: user.id, name: user.name, visitId: visit.id });
   } catch (err) {
     console.error("POST /api/user failed:", err);
     return NextResponse.json(

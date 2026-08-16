@@ -304,12 +304,20 @@ export default function AdminView() {
             {data.categories.length} หมวดหมู่ · {data.menuItems.length} เมนู
           </p>
         </div>
-        <a
-          href="/insights"
-          className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-muted"
-        >
-          📊 ดู Insights
-        </a>
+        <div className="flex gap-2">
+          <a
+            href="/admin/users"
+            className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-muted"
+          >
+            👥 ผู้ใช้
+          </a>
+          <a
+            href="/insights"
+            className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-muted"
+          >
+            📊 ดู Insights
+          </a>
+        </div>
       </header>
 
       {notice && (

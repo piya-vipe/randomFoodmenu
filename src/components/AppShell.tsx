@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createOrGetUser, fetchState, pickMenu, resetPicks, sendFeedback } from "@/lib/api";
+import {
+  createOrGetUser,
+  deleteLocation,
+  fetchState,
+  pickMenu,
+  resetPicks,
+  saveLocation,
+  sendFeedback,
+} from "@/lib/api";
 import type { StateResponse, Vote } from "@/lib/types";
+import LocationPrompt from "./LocationPrompt";
 import NameForm from "./NameForm";
 import Header from "./Header";
 import CategoryGrid from "./CategoryGrid";
@@ -12,6 +21,8 @@ import ShuffleOverlay from "./ShuffleOverlay";
 
 const STORAGE_USER_ID = "menuPicker.userId";
 const STORAGE_USER_NAME = "menuPicker.userName";
+/** Remembers that we already asked about location, so we ask once per browser. */
+const STORAGE_LOCATION_ASKED = "menuPicker.locationAsked";
 
 type Screen = "loading" | "name" | "app";
 
@@ -33,6 +44,8 @@ export default function AppShell() {
   const [result, setResult] = useState<(ResultState & { scopeSlug?: string }) | null>(null);
   const [resetting, setResetting] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [visitId, setVisitId] = useState<string | null>(null);
+  const [askLocation, setAskLocation] = useState(false);
 
   const loadState = useCallback(async (id: string) => {
     const data = await fetchState(id);
@@ -74,8 +87,14 @@ export default function AppShell() {
       localStorage.setItem(STORAGE_USER_ID, user.id);
       localStorage.setItem(STORAGE_USER_NAME, user.name);
       setUserId(user.id);
+      setVisitId(user.visitId);
       await loadState(user.id);
       setScreen("app");
+
+      // Ask about location once per browser, after they're already in.
+      if (!localStorage.getItem(STORAGE_LOCATION_ASKED)) {
+        setAskLocation(true);
+      }
     } catch (err) {
       setNameError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -154,6 +173,38 @@ export default function AppShell() {
     }
   };
 
+  const handleShareLocation = async (coords: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  }) => {
+    localStorage.setItem(STORAGE_LOCATION_ASKED, "1");
+    setAskLocation(false);
+    if (!visitId) return;
+    try {
+      await saveLocation(visitId, coords);
+    } catch {
+      // Location is entirely optional — never block the app on it.
+    }
+  };
+
+  const handleSkipLocation = () => {
+    localStorage.setItem(STORAGE_LOCATION_ASKED, "1");
+    setAskLocation(false);
+  };
+
+  const handleForgetLocation = async () => {
+    if (!userId) return;
+    if (!window.confirm("ลบข้อมูลตำแหน่งทั้งหมดของคุณออกจากระบบ?")) return;
+    try {
+      await deleteLocation(userId);
+      localStorage.removeItem(STORAGE_LOCATION_ASKED);
+      setBanner("ลบข้อมูลตำแหน่งของคุณเรียบร้อยแล้ว");
+    } catch (err) {
+      setBanner(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+    }
+  };
+
   const handleReset = async () => {
     if (!userId) return;
     if (!window.confirm("ต้องการรีเซ็ตเมนูที่สุ่มไปแล้วทั้งหมดใช่ไหม?")) return;
@@ -176,6 +227,7 @@ export default function AppShell() {
     setState(null);
     setResult(null);
     setShuffle(null);
+    setVisitId(null);
     setScreen("name");
   };
 
@@ -226,6 +278,19 @@ export default function AppShell() {
       />
 
       <HistoryList picks={state.picks} onVote={handleVote} />
+
+      <div className="mx-auto w-full max-w-3xl px-4 pb-10 text-center">
+        <button
+          onClick={handleForgetLocation}
+          className="text-xs text-muted-foreground underline hover:text-foreground"
+        >
+          ลบข้อมูลตำแหน่งของฉัน
+        </button>
+      </div>
+
+      {askLocation && (
+        <LocationPrompt onShare={handleShareLocation} onSkip={handleSkipLocation} />
+      )}
 
       {shuffle && (
         <ShuffleOverlay

@@ -56,6 +56,24 @@ export default function NameForm({
         <p className="mt-4 text-center text-xs text-muted-foreground">
           ระบบจะจำเมนูที่คุณสุ่มไปแล้วไว้ จนกว่าจะกด &quot;รีเซ็ตเมนู&quot;
         </p>
+
+        <details className="mt-3">
+          <summary className="cursor-pointer text-center text-xs text-muted-foreground underline">
+            เราเก็บข้อมูลอะไรบ้าง?
+          </summary>
+          <div className="mt-2 rounded-xl bg-surface-muted p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-1.5">
+              เว็บนี้เป็นโปรเจกต์การศึกษา เก็บข้อมูลเพื่อนำไปวิเคราะห์พฤติกรรมการเลือกเมนู:
+            </p>
+            <ul className="flex flex-col gap-1">
+              <li>• ชื่อที่คุณกรอก และเมนูที่คุณสุ่มได้</li>
+              <li>• คะแนน 👍/👎 ที่คุณให้แต่ละเมนู</li>
+              <li>• ชนิดอุปกรณ์/เบราว์เซอร์ที่ใช้ (จากข้อมูลที่เบราว์เซอร์ส่งมาอยู่แล้ว)</li>
+              <li>• ตำแหน่งที่ตั้ง — เฉพาะเมื่อคุณกดอนุญาตเท่านั้น ไม่กดก็ใช้งานได้ปกติ</li>
+            </ul>
+            <p className="mt-1.5">เราไม่เก็บหมายเลข IP และไม่ส่งข้อมูลให้บุคคลที่สาม</p>
+          </div>
+        </details>
       </form>
     </div>
   );
