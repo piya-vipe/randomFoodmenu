@@ -75,3 +75,83 @@ body {
 .animate-fade-in {
   animation: fade-in 0.18s ease-out;
 }
+
+/* Slot-machine reel: each name swaps in with a quick vertical flick. */
+@keyframes reel-flick {
+  0% {
+    opacity: 0;
+    transform: translateY(60%) scale(0.94);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-reel-flick {
+  animation: reel-flick 0.12s ease-out;
+}
+
+/* The winning name landing after the reel stops. */
+@keyframes reel-land {
+  0% {
+    transform: scale(0.6) rotate(-4deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12) rotate(1.5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-reel-land {
+  animation: reel-land 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Wobble for the spinning dice/pot while the reel runs. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(-9deg) translateY(0);
+  }
+  50% {
+    transform: rotate(9deg) translateY(-6px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.35s ease-in-out infinite;
+}
+
+/* Confetti pieces raining down behind the result card. */
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(-12vh) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(88vh) rotate(680deg);
+  }
+}
+
+.animate-confetti {
+  animation: confetti-fall linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-reel-flick,
+  .animate-reel-land,
+  .animate-shake,
+  .animate-confetti,
+  .animate-pop-in {
+    animation: none !important;
+  }
+}

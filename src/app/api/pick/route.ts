@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
 
     const eligible = await prisma.menuItem.findMany({
       where: {
+        isActive: true,
         ...(categorySlug ? { category: { slug: categorySlug } } : {}),
         ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
       },
@@ -64,15 +65,30 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Decoy names for the shuffle animation. Drawn from the same eligible pool
+    // so the reel looks plausible, with the winner appended last.
+    const decoys = eligible
+      .filter((item) => item.id !== chosen.id)
+      .map((item) => item.name)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 11);
+
     return NextResponse.json({
       ok: true,
       done: false,
-      item: { name: chosen.name, steps: chosen.steps },
+      item: {
+        id: chosen.id,
+        name: chosen.name,
+        steps: chosen.steps,
+        ingredients: chosen.ingredients,
+        servingSize: chosen.servingSize,
+      },
       category: {
         slug: chosen.category.slug,
         name: chosen.category.name,
         emoji: chosen.category.emoji ?? "🍽️",
       },
+      reel: [...decoys, chosen.name],
     });
   } catch (err) {
     console.error("POST /api/pick failed:", err);

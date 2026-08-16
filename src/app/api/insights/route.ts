@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { InsightsResponse } from "@/lib/types";
+import type { FeedbackRow, InsightsResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [totalUsers, allPicks, allResets, allCategories] = await Promise.all([
+    const [totalUsers, allPicks, allResets, allCategories, allFeedback] = await Promise.all([
       prisma.user.count(),
       prisma.pick.findMany({
         select: {
@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
         orderBy: { order: "asc" },
         include: { menuItems: { select: { id: true, name: true } } },
       }),
+      prisma.feedback.findMany({ select: { menuItemId: true, vote: true } }),
     ]);
 
     type CategoryAgg = {
@@ -171,9 +172,66 @@ export async function GET(req: NextRequest) {
 
     const totalMethodPicks = methodCounts.CATEGORY + methodCounts.RANDOM + methodCounts.UNKNOWN;
 
+    // ---- Feedback (like/dislike) aggregation ----
+    const voteAggById = new Map<string, { likes: number; dislikes: number }>();
+    for (const f of allFeedback) {
+      if (!voteAggById.has(f.menuItemId)) {
+        voteAggById.set(f.menuItemId, { likes: 0, dislikes: 0 });
+      }
+      const agg = voteAggById.get(f.menuItemId)!;
+      if (f.vote === "LIKE") agg.likes += 1;
+      else agg.dislikes += 1;
+    }
+
+    const feedbackRows: FeedbackRow[] = [];
+    const noFeedback: { name: string; categoryName: string; categoryEmoji: string }[] = [];
+
+    for (const [itemId, item] of itemAggById.entries()) {
+      const votes = voteAggById.get(itemId);
+      if (!votes || votes.likes + votes.dislikes === 0) {
+        noFeedback.push({
+          name: item.name,
+          categoryName: item.categoryName,
+          categoryEmoji: item.categoryEmoji,
+        });
+        continue;
+      }
+      const total = votes.likes + votes.dislikes;
+      feedbackRows.push({
+        menuItemId: itemId,
+        name: item.name,
+        categoryName: item.categoryName,
+        categoryEmoji: item.categoryEmoji,
+        likes: votes.likes,
+        dislikes: votes.dislikes,
+        total,
+        likePercent: round1((votes.likes / total) * 100),
+      });
+    }
+
+    const totalLikes = allFeedback.filter((f) => f.vote === "LIKE").length;
+    const totalDislikes = allFeedback.length - totalLikes;
+
+    const mostLiked = [...feedbackRows]
+      .sort((a, b) => b.likes - a.likes || b.likePercent - a.likePercent)
+      .slice(0, 10);
+    const mostDisliked = [...feedbackRows]
+      .sort((a, b) => b.dislikes - a.dislikes || a.likePercent - b.likePercent)
+      .slice(0, 10);
+    // Worth considering for removal: enough signal to trust, and mostly negative.
+    const dropCandidates = feedbackRows
+      .filter((r) => r.total >= 3 && r.likePercent < 40)
+      .sort((a, b) => a.likePercent - b.likePercent || b.total - a.total);
+
     const payload: InsightsResponse = {
       generatedAt: new Date().toISOString(),
-      totals: { users: totalUsers, activeUsers, picks: totalPicks, resets: totalResets },
+      totals: {
+        users: totalUsers,
+        activeUsers,
+        picks: totalPicks,
+        resets: totalResets,
+        votes: allFeedback.length,
+      },
       pickMethod: {
         category: methodCounts.CATEGORY,
         random: methodCounts.RANDOM,
@@ -189,6 +247,18 @@ export async function GET(req: NextRequest) {
       resetStats: { totalResets, avgClearedCount, maxClearedCount },
       dailyPicks,
       topUsers,
+      feedback: {
+        overall: {
+          likes: totalLikes,
+          dislikes: totalDislikes,
+          likePercent:
+            allFeedback.length > 0 ? round1((totalLikes / allFeedback.length) * 100) : 0,
+        },
+        mostLiked,
+        mostDisliked,
+        dropCandidates,
+        noFeedback,
+      },
     };
 
     return NextResponse.json(payload);

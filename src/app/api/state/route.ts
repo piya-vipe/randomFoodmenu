@@ -16,11 +16,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "ไม่พบผู้ใช้นี้" }, { status: 404 });
     }
 
-    const [categories, picks] = await Promise.all([
+    const [categories, picks, votes] = await Promise.all([
       prisma.category.findMany({
         orderBy: { order: "asc" },
         include: {
           menuItems: {
+            where: { isActive: true },
             select: {
               id: true,
               picks: { where: { userId }, select: { id: true } },
@@ -33,7 +34,13 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: { menuItem: { include: { category: true } } },
       }),
+      prisma.feedback.findMany({
+        where: { userId },
+        select: { menuItemId: true, vote: true },
+      }),
     ]);
+
+    const voteByItem = new Map(votes.map((v) => [v.menuItemId, v.vote]));
 
     const categorySummaries: CategorySummary[] = categories.map((c) => ({
       slug: c.slug,
@@ -45,8 +52,12 @@ export async function GET(req: NextRequest) {
 
     const pickHistory: PickHistoryItem[] = picks.map((p) => ({
       id: p.id,
+      menuItemId: p.menuItemId,
       menuItemName: p.menuItem.name,
       steps: p.menuItem.steps,
+      ingredients: p.menuItem.ingredients,
+      servingSize: p.menuItem.servingSize,
+      vote: voteByItem.get(p.menuItemId) ?? null,
       categorySlug: p.menuItem.category.slug,
       categoryName: p.menuItem.category.name,
       categoryEmoji: p.menuItem.category.emoji ?? "🍽️",

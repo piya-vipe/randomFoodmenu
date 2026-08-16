@@ -1,18 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createOrGetUser, fetchState, pickMenu, resetPicks } from "@/lib/api";
-import type { StateResponse } from "@/lib/types";
+import { createOrGetUser, fetchState, pickMenu, resetPicks, sendFeedback } from "@/lib/api";
+import type { StateResponse, Vote } from "@/lib/types";
 import NameForm from "./NameForm";
 import Header from "./Header";
 import CategoryGrid from "./CategoryGrid";
 import HistoryList from "./HistoryList";
 import ResultModal, { type ResultState } from "./ResultModal";
+import ShuffleOverlay from "./ShuffleOverlay";
 
 const STORAGE_USER_ID = "menuPicker.userId";
 const STORAGE_USER_NAME = "menuPicker.userName";
 
 type Screen = "loading" | "name" | "app";
+
+type PendingReveal = {
+  reel: string[];
+  scopeLabel: string;
+  scopeEmoji: string;
+  result: ResultState & { scopeSlug?: string };
+};
 
 export default function AppShell() {
   const [screen, setScreen] = useState<Screen>("loading");
@@ -21,10 +29,8 @@ export default function AppShell() {
   const [nameSubmitting, setNameSubmitting] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [pickingSlug, setPickingSlug] = useState<string | null>(null);
-  const [result, setResult] = useState<
-    | (ResultState & { scopeSlug?: string })
-    | null
-  >(null);
+  const [shuffle, setShuffle] = useState<PendingReveal | null>(null);
+  const [result, setResult] = useState<(ResultState & { scopeSlug?: string }) | null>(null);
   const [resetting, setResetting] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -81,29 +87,70 @@ export default function AppShell() {
     if (!userId) return;
     setPickingSlug(uiKey);
     setBanner(null);
+    setResult(null);
     try {
       const res = await pickMenu(userId, scopeSlug);
       if (!res.ok) {
         setBanner(res.error);
         return;
       }
+
       if (res.done) {
         setResult({ kind: "done", message: res.message, scopeSlug });
-      } else {
-        setResult({
+        await loadState(userId);
+        return;
+      }
+
+      const scopeCategory = scopeSlug
+        ? state?.categories.find((c) => c.slug === scopeSlug)
+        : undefined;
+
+      // Hold the answer behind the shuffle animation; ShuffleOverlay reveals it.
+      setShuffle({
+        reel: res.reel,
+        scopeLabel: scopeCategory ? scopeCategory.name : "ทุกหมวด",
+        scopeEmoji: scopeCategory ? scopeCategory.emoji : "🎲",
+        result: {
           kind: "item",
+          menuItemId: res.item.id,
           itemName: res.item.name,
           steps: res.item.steps,
+          ingredients: res.item.ingredients,
+          servingSize: res.item.servingSize,
           categoryName: res.category.name,
           categoryEmoji: res.category.emoji,
           scopeSlug,
-        });
-      }
+        },
+      });
+
       await loadState(userId);
     } catch (err) {
       setBanner(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
       setPickingSlug(null);
+    }
+  };
+
+  const handleVote = async (menuItemId: string, vote: Vote) => {
+    if (!userId || !state) return;
+
+    // Tapping the active vote again clears it.
+    const current = state.picks.find((p) => p.menuItemId === menuItemId)?.vote ?? null;
+    const nextVote = current === vote ? null : vote;
+
+    // Optimistic update so the button responds instantly.
+    setState({
+      ...state,
+      picks: state.picks.map((p) =>
+        p.menuItemId === menuItemId ? { ...p, vote: nextVote } : p
+      ),
+    });
+
+    try {
+      await sendFeedback(userId, menuItemId, nextVote);
+    } catch (err) {
+      setBanner(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+      await loadState(userId).catch(() => {});
     }
   };
 
@@ -128,6 +175,7 @@ export default function AppShell() {
     setUserId(null);
     setState(null);
     setResult(null);
+    setShuffle(null);
     setScreen("name");
   };
 
@@ -140,13 +188,16 @@ export default function AppShell() {
   }
 
   if (screen === "name" || !state) {
-    return (
-      <NameForm onSubmit={handleNameSubmit} submitting={nameSubmitting} error={nameError} />
-    );
+    return <NameForm onSubmit={handleNameSubmit} submitting={nameSubmitting} error={nameError} />;
   }
 
   const totalItems = state.categories.reduce((sum, c) => sum + c.total, 0);
   const totalPicked = state.categories.reduce((sum, c) => sum + c.pickedCount, 0);
+
+  const resultVote =
+    result?.kind === "item"
+      ? state.picks.find((p) => p.menuItemId === result.menuItemId)?.vote ?? null
+      : null;
 
   return (
     <>
@@ -171,14 +222,30 @@ export default function AppShell() {
         categories={state.categories}
         onPickCategory={(slug) => runPick(slug, slug)}
         onPickRandom={() => runPick(undefined, "__random__")}
-        pickingSlug={pickingSlug}
+        pickingSlug={pickingSlug ?? (shuffle ? "__random__" : null)}
       />
 
-      <HistoryList picks={state.picks} />
+      <HistoryList picks={state.picks} onVote={handleVote} />
 
-      {result && (
+      {shuffle && (
+        <ShuffleOverlay
+          reel={shuffle.reel}
+          scopeLabel={shuffle.scopeLabel}
+          scopeEmoji={shuffle.scopeEmoji}
+          onDone={() => {
+            setResult(shuffle.result);
+            setShuffle(null);
+          }}
+        />
+      )}
+
+      {result && !shuffle && (
         <ResultModal
           result={result}
+          vote={resultVote}
+          onVote={(vote) =>
+            result.kind === "item" ? handleVote(result.menuItemId, vote) : undefined
+          }
           onClose={() => setResult(null)}
           rerolling={pickingSlug !== null}
           rerollLabel={result.scopeSlug ? "สุ่มหมวดนี้อีกครั้ง" : "สุ่มอีกครั้ง"}

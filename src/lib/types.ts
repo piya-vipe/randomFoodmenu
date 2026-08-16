@@ -6,10 +6,16 @@ export type CategorySummary = {
   pickedCount: number;
 };
 
+export type Vote = "LIKE" | "DISLIKE";
+
 export type PickHistoryItem = {
   id: string;
+  menuItemId: string;
   menuItemName: string;
   steps: string[];
+  ingredients: string[];
+  servingSize: string;
+  vote: Vote | null;
   categorySlug: string;
   categoryName: string;
   categoryEmoji: string;
@@ -24,12 +30,22 @@ export type StateResponse = {
 
 export type PickMethod = "CATEGORY" | "RANDOM";
 
+export type PickedItem = {
+  id: string;
+  name: string;
+  steps: string[];
+  ingredients: string[];
+  servingSize: string;
+};
+
 export type PickResponse =
   | {
       ok: true;
       done: false;
-      item: { name: string; steps: string[] };
+      item: PickedItem;
       category: { slug: string; name: string; emoji: string };
+      /** Names used to animate the shuffle reel before the winner lands. */
+      reel: string[];
     }
   | {
       ok: true;
@@ -43,7 +59,13 @@ export type PickResponse =
 
 export type InsightsResponse = {
   generatedAt: string;
-  totals: { users: number; activeUsers: number; picks: number; resets: number };
+  totals: {
+    users: number;
+    activeUsers: number;
+    picks: number;
+    resets: number;
+    votes: number;
+  };
   pickMethod: {
     category: number;
     random: number;
@@ -66,4 +88,56 @@ export type InsightsResponse = {
   resetStats: { totalResets: number; avgClearedCount: number; maxClearedCount: number };
   dailyPicks: { date: string; count: number }[];
   topUsers: { name: string; pickCount: number; categoriesTouched: number }[];
+  /** Menus ranked by how well they land with users — drives keep/drop decisions. */
+  feedback: {
+    overall: { likes: number; dislikes: number; likePercent: number };
+    mostLiked: FeedbackRow[];
+    mostDisliked: FeedbackRow[];
+    dropCandidates: FeedbackRow[];
+    noFeedback: { name: string; categoryName: string; categoryEmoji: string }[];
+  };
+};
+
+export type FeedbackRow = {
+  menuItemId: string;
+  name: string;
+  categoryName: string;
+  categoryEmoji: string;
+  likes: number;
+  dislikes: number;
+  total: number;
+  likePercent: number;
+};
+
+/* ---------- Admin ---------- */
+
+export type AdminMenuItem = {
+  id: string;
+  name: string;
+  steps: string[];
+  ingredients: string[];
+  servingSize: string;
+  source: "SEED" | "MANUAL";
+  isActive: boolean;
+  categorySlug: string;
+  categoryName: string;
+  categoryEmoji: string;
+  pickCount: number;
+  likes: number;
+  dislikes: number;
+};
+
+export type AdminCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  emoji: string;
+  order: number;
+  source: "SEED" | "MANUAL";
+  itemCount: number;
+};
+
+export type AdminDataResponse = {
+  categories: AdminCategory[];
+  menuItems: AdminMenuItem[];
 };

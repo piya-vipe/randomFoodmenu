@@ -8,32 +8,73 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id        String       @id @default(cuid())
+  name      String       @unique
+  createdAt DateTime     @default(now())
   picks     Pick[]
   resets    ResetEvent[]
+  feedback  Feedback[]
+}
+
+// Where a row came from. SEED rows are managed by prisma/seed.ts and get
+// pruned/updated on every deploy; MANUAL rows are created through the admin
+// UI and are never touched by the seed.
+enum ContentSource {
+  SEED
+  MANUAL
 }
 
 model Category {
-  id        String     @id @default(cuid())
-  slug      String     @unique
+  id        String        @id @default(cuid())
+  slug      String        @unique
   name      String
   emoji     String?
-  order     Int        @default(0)
+  order     Int           @default(0)
+  source    ContentSource @default(SEED)
   menuItems MenuItem[]
 }
 
 model MenuItem {
-  id         String   @id @default(cuid())
-  name       String
+  id          String        @id @default(cuid())
+  name        String
   // Ordered, step-by-step cooking instructions (one string per step).
-  steps      String[]
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  picks      Pick[]
+  steps       String[]
+  // Ingredients scaled for a single serving, e.g. "ไข่ไก่ 2 ฟอง".
+  ingredients String[]
+  // Human-readable portion this recipe yields, e.g. "1 จาน".
+  servingSize String        @default("1 ที่")
+  source      ContentSource @default(SEED)
+  // Manually hidden from random picks without deleting the row (keeps history intact).
+  isActive    Boolean       @default(true)
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  picks       Pick[]
+  feedback    Feedback[]
 
   @@unique([categoryId, name])
+  @@index([isActive])
+}
+
+// Thumbs up/down on a menu the user was served — drives "which menus to keep
+// vs. drop". One vote per user per menu item; re-voting overwrites.
+enum Vote {
+  LIKE
+  DISLIKE
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  vote       Vote
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, menuItemId])
+  @@index([vote])
+  @@index([createdAt])
 }
 
 // How a pick was triggered — lets us analyze random vs. deliberate category browsing.

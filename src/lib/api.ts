@@ -1,4 +1,4 @@
-import type { PickResponse, StateResponse } from "./types";
+import type { PickResponse, StateResponse, Vote } from "./types";
 
 async function parseJsonOrThrow<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => null);
@@ -32,6 +32,19 @@ export async function pickMenu(userId: string, categorySlug?: string): Promise<P
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, categorySlug }),
+  });
+  return parseJsonOrThrow(res);
+}
+
+export async function sendFeedback(
+  userId: string,
+  menuItemId: string,
+  vote: Vote | null
+): Promise<{ ok: true; vote: Vote | null }> {
+  const res = await fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, menuItemId, vote }),
   });
   return parseJsonOrThrow(res);
 }

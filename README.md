@@ -7,11 +7,14 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 ## Features
 
 - Enter a name → creates/loads a user (stored server-side in Postgres, so history follows you across devices/browsers under the same name).
-- 6 categories × 5-6 menu items each, each with a step-by-step how-to-cook guide (see [prisma/seed.ts](prisma/seed.ts)).
+- 6 categories × 5-6 menu items each, with **per-serving ingredients** and a **step-by-step how-to-cook guide** (see [prisma/seed.ts](prisma/seed.ts)).
 - Pick a category, or hit "สุ่มสุดๆ" to pick from every category at once.
+- **Slot-machine reveal**: picks play out as an accelerating-then-slowing name reel, landing on the winner with a confetti burst (respects `prefers-reduced-motion`).
+- **👍 / 👎 feedback** on every result — one vote per user per menu, re-tappable to clear. Drives the keep-vs-drop analytics.
 - Already-picked items are excluded from future random picks for that user, until they hit **รีเซ็ตเมนู**.
-- Progress shown per-category and as a running history list (with expandable recipe steps).
-- **Usage analytics**: every pick and reset is logged (which category, random-vs-deliberate, how many menus were cleared on reset), surfaced on a key-protected `/insights` dashboard — see [Insights dashboard](#insights-dashboard) below.
+- Progress shown per-category and as a running history list (expandable to ingredients + steps, re-votable).
+- **Usage analytics**: every pick, reset, and vote is logged, surfaced on a key-protected `/insights` dashboard — see [Insights dashboard](#insights-dashboard) below.
+- **Menu admin**: add/edit/hide/delete menus and categories from a key-protected `/admin` page — see [Managing menus](#managing-menus) below.
 
 ## Tech stack
 
@@ -24,20 +27,25 @@ Built with **Next.js (App Router) + TypeScript + Tailwind CSS v4 + Prisma + Post
 
 ```
 prisma/
-  schema.prisma      # User, Category, MenuItem, Pick, ResetEvent models
-  seed.ts            # 6 categories x 5-6 menu items, each with step-by-step instructions (Thai)
+  schema.prisma      # User, Category, MenuItem, Pick, ResetEvent, Feedback models
+  seed.ts            # 6 categories x 5-6 menu items, with ingredients + step-by-step instructions (Thai)
 src/
   app/
     api/
-      user/route.ts      # POST: get-or-create user by name
-      state/route.ts     # GET: categories + pick history for a user
-      pick/route.ts       # POST: random-pick a menu (category or all), records it + how it was picked
-      reset/route.ts      # POST: clear a user's picks, logs a ResetEvent
-      insights/route.ts   # GET: aggregated analytics (key-protected via INSIGHTS_KEY)
+      user/route.ts           # POST: get-or-create user by name
+      state/route.ts          # GET: categories + pick history (with ingredients/steps/votes)
+      pick/route.ts            # POST: random-pick a menu, records it + how it was picked, returns shuffle reel
+      feedback/route.ts        # POST: record/clear a 👍/👎 vote
+      reset/route.ts           # POST: clear a user's picks, logs a ResetEvent
+      insights/route.ts        # GET: aggregated analytics (key-protected)
+      admin/menu/route.ts      # GET/POST/PATCH/DELETE: menu item CRUD (key-protected)
+      admin/category/route.ts  # POST/DELETE: category CRUD (key-protected)
     insights/page.tsx   # /insights dashboard
+    admin/page.tsx      # /admin menu manager
     layout.tsx, page.tsx, globals.css
-  components/           # NameForm, Header, CategoryGrid, ResultModal, HistoryList, AppShell, InsightsView
-  lib/                  # prisma client singleton, typed API client, shared types
+  components/           # NameForm, Header, CategoryGrid, ShuffleOverlay, Confetti,
+                        # ResultModal, HistoryList, AppShell, InsightsView, AdminView
+  lib/                  # prisma client singleton, typed API client, admin auth helper, shared types
 ```
 
 ## Local development
@@ -98,6 +106,7 @@ git push -u origin main
 | -------------- | ----------------------------------------- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (from the Postgres plugin) |
 | `INSIGHTS_KEY` | Any secret string you make up — required to view `/insights` |
+| `ADMIN_KEY`    | Secret for `/admin` (menu manager). Optional — falls back to `INSIGHTS_KEY` if unset |
 
 ## Insights dashboard
 
@@ -112,8 +121,29 @@ What it shows, all computed live from the database:
 - **Most active users** by pick count and how many distinct categories they've explored.
 - **Reset behavior**: how many times people reset, and on average how many menus they'd collected first (a proxy for "how much people explore before starting over").
 - **14-day activity chart** of picks per day.
+- **Overall like rate**, plus **most-liked** and **most-disliked** menus.
+- **⚠️ Drop candidates** — menus with at least 3 votes and under 40% likes. This is the "which menus should we delete" list.
 
-This data comes from two things recorded automatically as people use the app: every `Pick` now stores whether it came from a specific category or full-random, and every reset writes a `ResetEvent` with how many menus were cleared. Nothing beyond a user's chosen name and their menu picks is collected — no device/location/tracking data.
+This data comes from what's recorded automatically as people use the app: every `Pick` stores whether it came from a specific category or full-random, every reset writes a `ResetEvent` with how many menus were cleared, and every 👍/👎 writes a `Feedback` row. Nothing beyond a user's chosen name, their picks, and their votes is collected — no device/location/tracking data.
+
+## Managing menus
+
+Visit `/admin` (key: `ADMIN_KEY`, or `INSIGHTS_KEY` if you didn't set a separate one). From there you can:
+
+- **Add a menu** to any category, with a serving size, an ingredient list (one per line), and numbered steps (one per line).
+- **Edit** any existing menu's name, serving size, ingredients, or steps.
+- **Hide** a menu (`isActive: false`) — it stops appearing in random picks but keeps its history and votes intact. Better than deleting when you just want to retire something.
+- **Delete** a menu permanently (also removes its picks and votes).
+- **Add a category** with its own emoji.
+
+### How manual menus survive redeploys
+
+Every category and menu item carries a `source` of either `SEED` or `MANUAL`:
+
+- `SEED` rows are owned by [prisma/seed.ts](prisma/seed.ts). The seed runs on every deploy and will **reset them to their seed values**, and delete any seed row you removed from the file.
+- `MANUAL` rows (anything created through `/admin`) are **never touched by the seed** — not updated, not deleted.
+
+So: use `/admin` for menus you want to add on the fly, and edit `prisma/seed.ts` for changes you want version-controlled in git. Editing a `SEED` row through `/admin` works, but the next deploy will overwrite it.
 
 ## Troubleshooting
 

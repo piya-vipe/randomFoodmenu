@@ -85,12 +85,13 @@ export default function InsightsView() {
   };
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    async function restore() {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (!stored) return;
       setKey(stored);
-      load(stored);
+      await load(stored);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    restore();
   }, []);
 
   if (!data) {
@@ -136,20 +137,118 @@ export default function InsightsView() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">📊 Insights</h1>
-        <button
-          onClick={() => load(key)}
-          disabled={loading}
-          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted disabled:opacity-60"
-        >
-          {loading ? "กำลังโหลด..." : "รีเฟรช"}
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/admin"
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted"
+          >
+            🍳 จัดการเมนู
+          </a>
+          <button
+            onClick={() => load(key)}
+            disabled={loading}
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted disabled:opacity-60"
+          >
+            {loading ? "กำลังโหลด..." : "รีเฟรช"}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatTile label="ผู้ใช้ทั้งหมด" value={data.totals.users} />
         <StatTile label="ผู้ใช้ที่เคยสุ่ม" value={data.totals.activeUsers} />
         <StatTile label="เมนูที่สุ่มไปแล้ว" value={data.totals.picks} />
         <StatTile label="จำนวนครั้งที่รีเซ็ต" value={data.totals.resets} />
+        <StatTile label="โหวตชอบ/ไม่ชอบ" value={data.totals.votes} />
+      </div>
+
+      <Section title="คะแนนความชอบโดยรวม">
+        {data.totals.votes > 0 ? (
+          <div className="flex flex-col gap-3">
+            <BarRow
+              label="👍 ชอบ"
+              value={`${data.feedback.overall.likes} โหวต (${data.feedback.overall.likePercent}%)`}
+              percent={data.feedback.overall.likePercent}
+            />
+            <BarRow
+              label="👎 ไม่ชอบ"
+              value={`${data.feedback.overall.dislikes} โหวต (${
+                Math.round((100 - data.feedback.overall.likePercent) * 10) / 10
+              }%)`}
+              percent={100 - data.feedback.overall.likePercent}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีใครโหวต — ปุ่ม 👍/👎 จะโผล่ตอนสุ่มเมนูได้
+          </p>
+        )}
+      </Section>
+
+      {data.feedback.dropCandidates.length > 0 && (
+        <Section title={`⚠️ เมนูที่ควรพิจารณาตัดออก (${data.feedback.dropCandidates.length})`}>
+          <p className="mb-3 text-xs text-muted-foreground">
+            เมนูที่มีคนโหวตอย่างน้อย 3 คน และมีคนชอบน้อยกว่า 40%
+          </p>
+          <ul className="flex flex-col gap-2">
+            {data.feedback.dropCandidates.map((r) => (
+              <li
+                key={r.menuItemId}
+                className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2 text-sm"
+              >
+                <span className="truncate">
+                  {r.categoryEmoji} {r.name}
+                  <span className="ml-1.5 text-xs text-muted-foreground">{r.categoryName}</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  👍 {r.likes} 👎 {r.dislikes} ({r.likePercent}%)
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Section title="👍 เมนูที่คนชอบที่สุด">
+          {data.feedback.mostLiked.length > 0 ? (
+            <ol className="flex flex-col gap-2">
+              {data.feedback.mostLiked.map((r, i) => (
+                <li key={r.menuItemId} className="flex items-center gap-2 text-sm">
+                  <span className="w-5 shrink-0 text-muted-foreground">{i + 1}.</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {r.categoryEmoji} {r.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    👍 {r.likes} ({r.likePercent}%)
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
+          )}
+        </Section>
+
+        <Section title="👎 เมนูที่คนไม่ชอบที่สุด">
+          {data.feedback.mostDisliked.length > 0 ? (
+            <ol className="flex flex-col gap-2">
+              {data.feedback.mostDisliked.map((r, i) => (
+                <li key={r.menuItemId} className="flex items-center gap-2 text-sm">
+                  <span className="w-5 shrink-0 text-muted-foreground">{i + 1}.</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {r.categoryEmoji} {r.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    👎 {r.dislikes} ({r.likePercent}%)
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
+          )}
+        </Section>
       </div>
 
       <Section title="สุ่มแบบไหนมากกว่ากัน">
